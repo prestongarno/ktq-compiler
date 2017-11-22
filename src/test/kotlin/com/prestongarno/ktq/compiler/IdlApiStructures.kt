@@ -12,6 +12,17 @@ class IdlApiStructures {
     """.trimIndent()
     val compilation = GraphQLCompiler(StringSchema(mockSchema))
     compilation.compile()
+    compilation.definitions.size eq 1
+    compilation.definitions.first().apply {
+      name eq "Foo"
+      this as TypeDef
+      supertypes.size eq 0
+      fields.size eq 1
+      fields.first().apply {
+        name eq "name"
+        type === StringType
+      }
+    }
   }
 
 }

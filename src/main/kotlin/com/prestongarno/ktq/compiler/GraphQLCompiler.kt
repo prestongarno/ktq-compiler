@@ -14,18 +14,17 @@ typealias SymbolScopeRule = Set<ScopedSymbol>.(ScopedDeclarationType<*>) -> Unit
 
 /**
  * TODO use antlr4's listener hooks to stop unnecessary iteration for validation rules */
-class GraphQLCompiler(private val schema: Schema, private val scope: Configuration.() -> Unit = { /* nothing */ }) {
+class GraphQLCompiler(
+    private val schema: Schema,
+    private val scope: Configuration.() -> Unit = { /* nothing */ }
+) {
 
   /** This is kept in sync by the [GraphQLCompiler.definitions] variable. Do NOT add definitions here */
   private val symtab: MutableMap<String, SchemaType<*>> = ScalarPrimitives.values().map {
     Pair(it.typeDef.name, it.typeDef)
   }.toMap(mutableMapOf())
 
-  private val definitions: MutableSet<SchemaType<*>> by Delegates.observable(
-      ScalarPrimitives.values().map {
-        it.typeDef as SchemaType<*>
-      }.toMutableSet()
-  ) { _, _, newValue ->
+  val definitions: MutableSet<SchemaType<*>> by Delegates.observable(mutableSetOf()) { _, _, newValue ->
     newValue.filter { symtab[it.name] == null }.forEach { defn ->
       symtab[defn.name] = defn
     }
@@ -39,7 +38,7 @@ class GraphQLCompiler(private val schema: Schema, private val scope: Configurati
 
   private val scopedSymbolRules = listOf<SymbolScopeRule>(
       `no duplicate symbol names`(),
-      `check supertype property inheritance`()
+      `check supertype property inheritance`() // TODO implement this rule
   )
 
   fun compile() {
@@ -161,12 +160,12 @@ class GraphQLCompiler(private val schema: Schema, private val scope: Configurati
 }
 
 /** Require each type has a different name */
-fun `duplicate type names check`(): SchemaRule = {
+private fun `duplicate type names check`(): SchemaRule = {
   // TODO is this really that inefficient? Github schema is 300+ definitions....
   forEach { defn -> require(count { it.name == defn.name } == 1) }
 }
 
-fun `type name does not match scalar primitive`(): SchemaRule = {
+private fun `type name does not match scalar primitive`(): SchemaRule = {
   forEach { defn ->
     require(ScalarPrimitives.normalized[defn.name] == null) {
       "Illegal schema declaration name '${defn.name}' at" + defn.context.sourceInterval.a
@@ -174,7 +173,7 @@ fun `type name does not match scalar primitive`(): SchemaRule = {
   }
 }
 
-fun `unique supertype declarations`(): SchemaRule = {
+private fun `unique supertype declarations`(): SchemaRule = {
   filterIsInstance<TypeDef>().forEach { type ->
     require(type.supertypes.distinct().size == type.supertypes.size) {
       "Illegal supertype declaration at type ${type.name} (duplicate declaration)"
@@ -183,13 +182,13 @@ fun `unique supertype declarations`(): SchemaRule = {
 }
 
 /** Require each symbol name to be unique within its enclosing scope */
-fun `no duplicate symbol names`(): SymbolScopeRule = {
+private fun `no duplicate symbol names`(): SymbolScopeRule = {
   forEach { symbol ->
     require(count { it.name == symbol.name } == 1)
   }
 }
 
-fun `check supertype property inheritance`(): SymbolScopeRule = { declarationType ->
+private fun `check supertype property inheritance`(): SymbolScopeRule = { declarationType ->
   if (declarationType is TypeDef) {
     // TODO(diamond problem)
   }
