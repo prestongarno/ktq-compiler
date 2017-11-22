@@ -17,12 +17,6 @@ public interface GraphQLSchemaVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitGraphqlSchema(GraphQLSchemaParser.GraphqlSchemaContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link GraphQLSchemaParser#definition}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDefinition(GraphQLSchemaParser.DefinitionContext ctx);
-	/**
 	 * Visit a parse tree produced by {@link GraphQLSchemaParser#typeDef}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

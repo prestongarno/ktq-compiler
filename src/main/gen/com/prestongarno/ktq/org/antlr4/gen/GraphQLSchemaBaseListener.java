@@ -28,18 +28,6 @@ public class GraphQLSchemaBaseListener implements GraphQLSchemaListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterDefinition(GraphQLSchemaParser.DefinitionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitDefinition(GraphQLSchemaParser.DefinitionContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
 	@Override public void enterTypeDef(GraphQLSchemaParser.TypeDefContext ctx) { }
 	/**
 	 * {@inheritDoc}

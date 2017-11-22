@@ -18,16 +18,6 @@ public interface GraphQLSchemaListener extends ParseTreeListener {
 	 */
 	void exitGraphqlSchema(GraphQLSchemaParser.GraphqlSchemaContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link GraphQLSchemaParser#definition}.
-	 * @param ctx the parse tree
-	 */
-	void enterDefinition(GraphQLSchemaParser.DefinitionContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link GraphQLSchemaParser#definition}.
-	 * @param ctx the parse tree
-	 */
-	void exitDefinition(GraphQLSchemaParser.DefinitionContext ctx);
-	/**
 	 * Enter a parse tree produced by {@link GraphQLSchemaParser#typeDef}.
 	 * @param ctx the parse tree
 	 */

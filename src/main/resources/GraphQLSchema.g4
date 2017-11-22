@@ -1,15 +1,11 @@
 grammar GraphQLSchema;
 
 graphqlSchema
-  : (TypeDeclaration definition)*
-  ;
-
-definition
-  : (typeDef|inputTypeDef|unionDef|enumDef|interfaceDef|scalarDef)
+  : (typeDef|inputTypeDef|unionDef|enumDef|interfaceDef|scalarDef)*
   ;
 
 typeDef
-  : typeName implementationDefs? '{' fieldDef+ '}'
+  : 'type' typeName implementationDefs? '{' fieldDef+ '}'
   ;
 
 implementationDefs
@@ -17,19 +13,19 @@ implementationDefs
   ;
 
 inputTypeDef
-  : typeName '{' fieldDef+ '}'
+  : 'input' typeName '{' fieldDef+ '}'
   ;
 
 interfaceDef
-  : typeName '{' fieldDef+ '}'
+  : 'interface' typeName '{' fieldDef+ '}'
   ;
 
 scalarDef
-  : typeName
+  : 'scalar' typeName
   ;
 
 unionDef
-  : typeName '=' unionTypes
+  : 'union' typeName '=' unionTypes
   ;
 
 unionTypes
@@ -37,7 +33,7 @@ unionTypes
   ;
 
 enumDef
-  : typeName '{' scalarName+ '}'
+  : 'enum' typeName '{' scalarName+ '}'
   ;
 
 scalarName
@@ -80,29 +76,6 @@ typeName
 defaultValue
   : '=' value
   ;
-
-TypeDeclaration
-   : (TYPE|INTERFACE|UNION|ENUM|SCALAR|INPUT)
-   ;
-
-TYPE
-   : 'input' Whitespace*
-   ;
-INTERFACE
-   : 'interface' Whitespace*
-   ;
-UNION
-   : 'union' Whitespace*
-   ;
-ENUM
-   : 'enum' Whitespace*
-   ;
- SCALAR
-   : 'scalar' Whitespace*
-   ;
-INPUT
-   : 'input' Whitespace*
-   ;
 
 Name
   : [a-zA-Z][_0-9A-Za-z]*

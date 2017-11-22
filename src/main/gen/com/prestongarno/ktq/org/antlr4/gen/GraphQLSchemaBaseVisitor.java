@@ -24,13 +24,6 @@ public class GraphQLSchemaBaseVisitor<T> extends AbstractParseTreeVisitor<T> imp
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDefinition(GraphQLSchemaParser.DefinitionContext ctx) { return visitChildren(ctx); }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation returns the result of calling
-	 * {@link #visitChildren} on {@code ctx}.</p>
-	 */
 	@Override public T visitTypeDef(GraphQLSchemaParser.TypeDefContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
