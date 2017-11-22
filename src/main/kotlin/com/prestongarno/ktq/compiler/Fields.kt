@@ -17,7 +17,7 @@ class FieldDefinition(val context: GraphQLSchemaParser.FieldDefContext): ScopedS
 
   override val nullable = context.typeSpec().nullable() == null
 
-  override val isList = context.typeSpec().listType() == null
+  override val isList = context.typeSpec().listType() != null
 
   override lateinit var type: SchemaType<*>
 
@@ -37,9 +37,9 @@ class ArgumentDefinition(val context: GraphQLSchemaParser.ArgumentContext): Scop
 
   override val typeName: String get() = context.typeSpec().typeName().text
 
-  override val nullable: Boolean get() = context.nullable().isEmpty
+  override val nullable = context.typeSpec().nullable() == null
 
-  override val isList: Boolean get() = context.typeSpec().listType().isEmpty
+  override val isList = context.typeSpec().listType() != null
 
   override lateinit var type: SchemaType<*>
 
