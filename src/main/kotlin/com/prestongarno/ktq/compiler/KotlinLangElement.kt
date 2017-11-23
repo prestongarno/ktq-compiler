@@ -1,5 +1,6 @@
 package com.prestongarno.ktq.compiler
 
+import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 
@@ -10,6 +11,8 @@ interface KotlinLangElement<T : Any> {
 interface KotlinTypeElement : KotlinLangElement<TypeSpec>
 
 interface KotlinPropertyElement : KotlinLangElement<PropertySpec>
+
+interface KotlinParameterElement : KotlinLangElement<ParameterSpec>
 
 
 interface NamedElement {

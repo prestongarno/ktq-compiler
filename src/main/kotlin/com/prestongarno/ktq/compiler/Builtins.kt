@@ -1,7 +1,5 @@
 package com.prestongarno.ktq.compiler
 
-import org.antlr.v4.runtime.ParserRuleContext
-
 enum class ScalarPrimitives(val typeDef: ScalarType) {
   INT(IntType),
   BOOLEAN(BooleanType),

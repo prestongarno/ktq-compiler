@@ -69,6 +69,7 @@ class GraphQLCompiler(
 
     attrInheritance()
     attrFields()
+    attrUnions()
 
     schemaRules.forEach { it(definitions) }
 
@@ -125,11 +126,28 @@ class GraphQLCompiler(
     }
   }
 
+  private fun attrUnions() {
+    fun UnionDef.setLateinitPossibilities(defs: Set<TypeDef>) {
+      possibilities = defs
+    }
+
+    definitions.on<UnionDef> {
+
+      context.unionTypes().typeName().map {
+        it.Name().text
+      }.map {
+        symtab[it] as TypeDef // safe cast - rule will prevent this
+      }.also { options ->
+        this.setLateinitPossibilities(options.toSet())
+      }
+    }
+  }
+
   /**
    * Apply validation to a set of symbols within the same scope */
   private fun inspectFields(vararg rules: SymbolScopeRule) {
-    definitions.filterIsInstance<ScopedDeclarationType<*>>().forEach {
-      rules.forEach { rule -> rule(it.fields, it) }
+    definitions.on<ScopedDeclarationType<*>> {
+      rules.forEach { rule -> rule(fields, this@on) }
     }
   }
 
@@ -195,3 +213,7 @@ private fun `check supertype property inheritance`(): SymbolScopeRule = { declar
 }
 
 private fun Token.toCoordinates() = "[${this.line},${this.startIndex}]"
+
+fun <T> List<T>.applyEach(scope: T.() -> Unit) = forEach(scope)
+
+inline fun <reified T> Collection<*>.on(action: T.() -> Unit) = filterIsInstance<T>().forEach(action)
