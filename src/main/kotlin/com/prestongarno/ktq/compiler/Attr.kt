@@ -4,12 +4,6 @@ import com.prestongarno.ktq.org.antlr4.gen.GraphQLSchemaParser
 import com.prestongarno.ktq.org.antlr4.gen.GraphQLSchemaParser.*
 
 /**
- * If a concrete type definition contains a field which both:
- *
- *   A) Overrides >1 superinterface declaration
- *   B) Changes input argument count
- *
- * Bounds for generic args on non-primitive delegates & stubs will be incorrect
  *
  * Strategy for entering field inheritance info for kotlinpoet generic args on fields:
  *   1. enter supertypes to type
@@ -18,31 +12,32 @@ import com.prestongarno.ktq.org.antlr4.gen.GraphQLSchemaParser.*
  *   4.   get values from local scoped cache
  *   5.   validate
  *   6.   create type info
+ *
  */
 internal fun GraphQLCompiler.attrInheritance() {
   definitions.on<TypeDef> {
-    // create a table for fields->supertype(s)
+
     val fieldSuperTable = fields
         .map(FieldDefinition::newCache)
         .toMap(mutableMapOf())
 
+    // TODO pass type && supertype to [registerAsSuper] method for diagnostics
     context.implementationDefs()
         ?.typeName()
         ?.map(TypeNameContext::toNameString)
         ?.map(this@attrInheritance::fromSymtab)
         ?.onEach { supertype ->
           supertype.fields
+              .onEach(this::requireOverrides)
               .map(this::joiningWithImplementation)
-              .onEach(this::checkConsistency)
               .map(::second)
               .map(supertype::registerAsSuper)
               .forEach(fieldSuperTable::cacheSymbol)
         }?.toSet()
-        ?.let(this@on::setSupertypes)
-        ?: setSupertypes(emptySet())
+        ?.let(this@on::setSupertypes) ?: setSupertypes(emptySet())
 
     fields.onEach(fieldSuperTable::setFieldInheritanceContext)
-        .onEach(this::assignArgBuilder)
+        .forEach(this::assignArgBuilder)
   }
 }
 
@@ -66,24 +61,15 @@ private fun TypeDef.joiningWithImplementation(abstractField: FieldDefinition): P
   return abstractField to concrete
 }
 
-/** @throws IllegalArgumentException if the GraphQL field and arguments don't match the interface's specification */
-private fun TypeDef.checkConsistency(properties: Pair<FieldDefinition, FieldDefinition>) {
-  properties.also { (abstract, concrete) ->
-    require(abstract.isAbstract && !concrete.isAbstract)
-    require(abstract.arguments.size <= concrete.arguments.size
-        && concrete.arguments.filter { cArg ->
-      abstract.arguments.find {
-        cArg.name != it.name
-            || cArg.isList != it.isList
-            || cArg.typeName != it.typeName
-      } != null
-    }.isEmpty()) {
-      abstract.arguments.find { it in concrete.arguments == false }?.let {
-        "Argument ${it.name} on interface not the same as concrete type '$name' field ${concrete.name}"
-      } ?: ""
-    }
-  }
-
+private fun TypeDef.requireOverrides(abstract: FieldDefinition) {
+  val concrete = symtab[abstract.name] ?: throw IllegalArgumentException(
+      "Abstract field ${abstract.name} not implemented in type $name")
+  require(concrete.run {
+    isList == abstract.isList
+        && nullable == abstract.nullable
+        && type == abstract.type
+        && arguments.containsAll(abstract.arguments)
+  }) { "Field ${abstract.name} does not override supertype property" }
 }
 
 private fun second(pair: Pair<FieldDefinition, FieldDefinition>): FieldDefinition = pair.second
@@ -91,6 +77,7 @@ private fun second(pair: Pair<FieldDefinition, FieldDefinition>): FieldDefinitio
 private fun InterfaceDef.registerAsSuper(field: FieldDefinition): Pair<FieldDefinition, InterfaceDef> = field to this
 
 private fun MutableMap<FieldDefinition, MutableSet<InterfaceDef>>.cacheSymbol(pair: Pair<FieldDefinition, InterfaceDef>) {
+  require(!pair.first.isAbstract)
   this[pair.first] = this[pair.first]?.apply { add(pair.second) } ?: mutableSetOf(pair.second)
 }
 

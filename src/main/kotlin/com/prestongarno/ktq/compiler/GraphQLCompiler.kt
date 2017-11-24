@@ -74,11 +74,12 @@ class GraphQLCompiler(
     definitions += result.unionDef().map { UnionDef(it) }
     symtab.putAll(definitions.map { it.name to it })
 
-    // processing & intermediate type structure
-    attrInheritance()
+    // intermediate
     attrFieldTypes()
+    attrInheritance()
     attrUnions()
 
+    // schema-specific rules
     schemaRules.onEach { it(definitions) }
     inspectFields(*scopedSymbolRules.toTypedArray())
   }
@@ -175,7 +176,7 @@ private fun Token.toCoordinates() = "[${this.line},${this.startIndex}]"
 
 fun <T> List<T>.applyEach(scope: T.() -> Unit) = forEach(scope)
 
-inline fun <reified T> Collection<*>.on(action: T.() -> Unit) = this?.filterIsInstance<T>()?.forEach(action)
+inline fun <reified T> Collection<*>.on(action: T.() -> Unit) = this.filterIsInstance<T>().forEach(action)
 
 private class MessageHandler : ANTLRErrorListener {
       override fun reportAttemptingFullContext(

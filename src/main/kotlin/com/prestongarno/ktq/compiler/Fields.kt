@@ -42,15 +42,13 @@ data class FieldDefinition(val context: GraphQLSchemaParser.FieldDefContext) : S
 
   lateinit var inheritsFrom: Set<InterfaceDef>
 
-  var isDisjoint = false
-
-  internal var argBuilder: ArgBuilderDef? = null // has to be done from an outside context
-
+  /** has to be done from an outside context. Created in [GraphQLCompiler.attrInheritance]*/
+  internal var argBuilder: ArgBuilderDef? = null
 
   val arguments: List<ArgumentDefinition> = context.fieldArgs()
       ?.argument()
       ?.map(::ArgumentDefinition)
-          ?: emptyList()
+      ?: emptyList()
 
   override fun toKotlin(): PropertySpec =
       PropertySpec.builder(name, ktqGraphQLDelegateKotlinpoetTypeName()).build()
@@ -136,6 +134,15 @@ data class ArgumentDefinition(val context: GraphQLSchemaParser.ArgumentContext) 
     return ParameterSpec.builder(name, type.apply {
       if (nullable) asNullable()
     }).build()
+  }
+
+  override fun equals(other: Any?): Boolean {
+    return other === this || (other as? ArgumentDefinition)?.let {
+      name == it.name
+          && typeName == it.typeName
+          && nullable == it.nullable
+          && isList == it.isList
+    } ?: return false
   }
 }
 

@@ -34,6 +34,7 @@ class IdlApiStructures {
         arguments.size eq 1
         nullable eq true
         isList eq false
+        require(argBuilder != null)
 
         arguments.first().apply {
           name eq "value"
@@ -65,7 +66,7 @@ class IdlApiStructures {
     assertThrows<IllegalArgumentException> {
       GraphQLCompiler(StringSchema(mockSchema)).compile()
     }.hasMessageThat()
-        .contains("interface not the same as concrete")
+        .contains("does not override")
   }
 
   @Test fun `nullable differences fails`() {
@@ -88,7 +89,7 @@ class IdlApiStructures {
     // TODO failing!
     assertThrows<IllegalArgumentException> {
       GraphQLCompiler(StringSchema(mockSchema)).compile()
-    }
+    }.hasMessageThat().contains("does not override")
   }
 
   @Test fun `multiple inheritance on fields`() {
