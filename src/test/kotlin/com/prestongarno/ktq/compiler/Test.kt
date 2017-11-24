@@ -25,7 +25,11 @@ fun compileGraphQl(schema: String, block: (GraphQLCompiler.() -> Unit)? = null) 
       block?.invoke(this)
     }.definitions
 
-fun compileOut(schema: String, includeImports: Boolean = true, block: (GraphQLCompiler.() -> Unit)? = null): String =
+fun compileOut(
+    schema: String,
+    includeImports: Boolean = true,
+    block: (GraphQLCompiler.() -> Unit)? = null
+): String =
     compileGraphQl(schema, block).toFileSpec().let {
       val target = StringBuilder()
       it.writeTo(target)

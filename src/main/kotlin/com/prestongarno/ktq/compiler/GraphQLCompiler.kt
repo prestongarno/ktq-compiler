@@ -2,18 +2,11 @@ package com.prestongarno.ktq.compiler
 
 import com.prestongarno.ktq.org.antlr4.gen.GraphQLSchemaLexer
 import com.prestongarno.ktq.org.antlr4.gen.GraphQLSchemaParser
-import org.antlr.v4.runtime.ANTLRErrorListener
 import org.antlr.v4.runtime.CharStream
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
-import org.antlr.v4.runtime.Parser
-import org.antlr.v4.runtime.RecognitionException
-import org.antlr.v4.runtime.Recognizer
 import org.antlr.v4.runtime.Token
-import org.antlr.v4.runtime.atn.ATNConfigSet
-import org.antlr.v4.runtime.dfa.DFA
 import java.io.File
-import java.util.*
 import kotlin.properties.Delegates
 
 typealias SchemaRule = Set<SchemaType<*>>.() -> Unit
@@ -77,33 +70,15 @@ class GraphQLCompiler(
     attrInheritance()
     attrUnions()
 
-    // TODO use MemberEnter style on AST like javac does
     schemaRules.onEach { it(definitions) }
     inspectFields(*scopedSymbolRules.toTypedArray())
   }
 
-
-  private fun attrFieldTypes() {
-
-    fun FieldDefinition.setType(type: SchemaType<*>) {
-      this.type = type
-    }
-    // get all types with fields
-    val contextTypes = definitions.filterIsInstance<ScopedDeclarationType<*>>()
-    // map field type name to type instance
-    contextTypes.flatMap { it.fields }.asSequence().forEach { field ->
-      symtab[field.typeName]?.let { type ->
-        field.setType(type)
-      } ?: throw IllegalArgumentException(
-          "Unknown type attr for field ${field.name} '$field.typeName' at ${field.context.start.toCoordinates()}")
-    }
-    // map arguments' type names to type instance TODO nest this ^^^
-    contextTypes.flatMap { it.fields.flatMap { it.arguments } }.forEach { argument ->
-      argument.type = symtab[argument.context.typeSpec().typeName().Name().text]
-          ?: throw IllegalArgumentException(
-          "Unknown type attr for argument ${argument.name} at ${argument.context.start.toCoordinates()}")
-    }
-  }
+  private fun attrFieldTypes() = definitions.filterIsInstance<ScopedDeclarationType<*>>()
+      .flatMap(ScopedDeclarationType<*>::expandSymbols)
+      .forEach { (symbol, typeContext) ->
+        symbol.type = this@GraphQLCompiler.symtab[symbol.typeName] ?: throw symbol.unknownTypeExc(typeContext)
+      }
 
   private fun attrUnions() {
     fun UnionDef.setLateinitPossibilities(defs: Set<TypeDef>) {
@@ -174,4 +149,16 @@ private fun Token.toCoordinates() = "[${this.line},${this.startIndex}]"
 fun <T> List<T>.applyEach(scope: T.() -> Unit) = forEach(scope)
 
 inline fun <reified T> Collection<*>.on(action: T.() -> Unit) = this.filterIsInstance<T>().forEach(action)
+
+private fun ScopedSymbol.unknownTypeExc(idlContext: ScopedDeclarationType<*>) = IllegalArgumentException(
+    "Unknown type '$typeName' for field ${idlContext.name}::$name at " + context.start.toCoordinates()
+)
+
+private fun ScopedDeclarationType<*>.expandSymbols() = run {
+  listOf<Iterable<ScopedSymbol>>(this@expandSymbols.fields,
+      this@expandSymbols.fields.flatMap { it.arguments })
+      .flatten()
+      .zip(generateSequence { this@expandSymbols }
+          .asIterable())
+}
 

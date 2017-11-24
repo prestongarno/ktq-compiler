@@ -25,14 +25,16 @@ import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.asTypeName
+import org.antlr.v4.runtime.ParserRuleContext
 
 sealed class ScopedSymbol : SymbolElement {
   abstract val nullable: Boolean
   abstract val isList: Boolean
   abstract var type: SchemaType<*>
+  abstract val context: ParserRuleContext
 }
 
-data class FieldDefinition(val context: GraphQLSchemaParser.FieldDefContext) : ScopedSymbol(), KotlinPropertyElement {
+data class FieldDefinition(override val context: GraphQLSchemaParser.FieldDefContext) : ScopedSymbol(), KotlinPropertyElement {
 
 
   override val name = context.fieldName().Name().text
@@ -142,7 +144,7 @@ data class FieldDefinition(val context: GraphQLSchemaParser.FieldDefContext) : S
 
 }
 
-data class ArgumentDefinition(val context: GraphQLSchemaParser.ArgumentContext) : ScopedSymbol(), KotlinParameterElement {
+data class ArgumentDefinition(override val context: GraphQLSchemaParser.ArgumentContext) : ScopedSymbol(), KotlinParameterElement {
 
   override val name: String get() = context.Name().text
 
