@@ -12,6 +12,7 @@ import com.prestongarno.ktq.stubs.TypeListStub
 import com.prestongarno.ktq.stubs.TypeStub
 import com.prestongarno.ktq.stubs.UnionListStub
 import com.prestongarno.ktq.stubs.UnionStub
+import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName
 import com.squareup.kotlinpoet.PropertySpec
@@ -41,20 +42,18 @@ data class FieldDefinition(val context: GraphQLSchemaParser.FieldDefContext) : S
 
   lateinit var inheritsFrom: Set<InterfaceDef>
 
-  var argBuilder: ArgBuilderDef? = null // has to be done from an outside context
+  var isDisjoint = false
 
-  class ArgBuilderDef(private val context: ScopedDeclarationType<*>, private val variable: FieldDefinition) {
-    val name = variable.name[0].toUpperCase() + if (variable.name.length > 1) variable.name.substring(1) else ""
-  }
+  internal var argBuilder: ArgBuilderDef? = null // has to be done from an outside context
+
 
   val arguments: List<ArgumentDefinition> = context.fieldArgs()
       ?.argument()
-      ?.map(::ArgumentDefinition) ?: emptyList()
+      ?.map(::ArgumentDefinition)
+          ?: emptyList()
 
-  override fun toKotlin(): PropertySpec {
-    PropertySpec.builder(name, ktqGraphQLDelegateKotlinpoetTypeName())
-    TODO("")
-  }
+  override fun toKotlin(): PropertySpec =
+      PropertySpec.builder(name, ktqGraphQLDelegateKotlinpoetTypeName()).build()
 
   /**
    * [ StubType ].[ Query<T> | OptionalConfigQuery<T, A> | ConfigurableQuery<T, A> ]
@@ -67,10 +66,7 @@ data class FieldDefinition(val context: GraphQLSchemaParser.FieldDefContext) : S
 
     fun FieldDefinition.configurationTypeClassName(): String = when {
       arguments.isEmpty() -> "Query"
-      arguments.isNotEmpty()
-          && arguments.find {
-        it.nullable == false
-      } == null -> "OptionalConfigQuery"
+      arguments.isNotEmpty() && arguments.find { it.nullable == false } == null -> "OptionalConfigQuery"
       else -> "ConfigurableQuery"
     }
 
@@ -81,6 +77,7 @@ data class FieldDefinition(val context: GraphQLSchemaParser.FieldDefContext) : S
       is InputDef -> QInput::class
       is TypeDef -> TypeStub::class
       is UnionDef -> UnionStub::class
+      is ScalarType -> ScalarPrimitives.normalized[type.name]!!.typeDef.stubClass
       else -> throw IllegalStateException()
     }
 
@@ -93,14 +90,28 @@ data class FieldDefinition(val context: GraphQLSchemaParser.FieldDefContext) : S
       is UnionDef -> UnionListStub::class
       else -> throw IllegalStateException()
     }
-
     // determine the base type of delegate/stub that this
     // property will be based off of the type and the arguments
     val baseTypeName = (if (isList) `type name for list field`() else `type name for non-collection field`())
         .asClassName()
         .nestedClass(configurationTypeClassName())
 
-    TODO()
+    fun FieldDefinition.argBuilderTypeName(): TypeName {
+      require(arguments.isNotEmpty())
+      return ClassName.bestGuess(argBuilder!!.context.name)
+          .nestedClass(argBuilder!!.name)
+    }
+
+    // When scalar/primitive type -> no type arg,
+    val parameterizedTypeNames: List<TypeName> = mutableListOf<TypeName>().apply {
+      if (type !is ScalarType) add(name.asTypeName())
+      if (arguments.isNotEmpty()) add(argBuilderTypeName())
+    }
+
+    return if (type is ScalarType && arguments.isEmpty()) baseTypeName else ParameterizedTypeName.get(
+        ClassName(baseTypeName.packageName(), baseTypeName.simpleName()),
+        *parameterizedTypeNames.toTypedArray()
+    )
   }
 
 }
@@ -120,11 +131,20 @@ data class ArgumentDefinition(val context: GraphQLSchemaParser.ArgumentContext) 
   override fun toKotlin(): ParameterSpec {
     val type = if (isList)
       ParameterizedTypeName.get(List::class.asClassName(), typeName.asTypeName())
-    else
-      typeName.asTypeName()
+    else typeName.asTypeName()
 
     return ParameterSpec.builder(name, type.apply {
       if (nullable) asNullable()
     }).build()
   }
 }
+
+internal class ArgBuilderDef(val field: FieldDefinition, val context: ScopedDeclarationType<*>) {
+
+  val isInterface = field.isAbstract
+
+  val name = (if (isInterface) "Base" else "") +
+      field.name[0].toUpperCase() +
+      (if (field.name.length > 1) field.name.substring(1) else "") + "Args"
+}
+

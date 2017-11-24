@@ -1,6 +1,12 @@
 package com.prestongarno.ktq.compiler
 
+import com.prestongarno.ktq.QEnumType
 import com.prestongarno.ktq.org.antlr4.gen.GraphQLSchemaParser
+import com.prestongarno.ktq.stubs.BooleanStub
+import com.prestongarno.ktq.stubs.FloatStub
+import com.prestongarno.ktq.stubs.IntStub
+import com.prestongarno.ktq.stubs.PrimitiveStub
+import com.prestongarno.ktq.stubs.StringStub
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.LambdaTypeName
@@ -9,7 +15,9 @@ import com.squareup.kotlinpoet.ParameterizedTypeName
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.asTypeName
 import org.antlr.v4.runtime.ParserRuleContext
+import kotlin.reflect.KClass
 
 sealed class SchemaType<out T : ParserRuleContext>(val context: T) : KotlinTypeElement, NamedElement
 
@@ -41,7 +49,10 @@ class InterfaceDef(context: GraphQLSchemaParser.InterfaceDefContext)
 
   override val name: String = context.typeName().Name().text
 
-  override val fields = context.fieldDef().map(::FieldDefinition).toSet()
+  override val fields = context.fieldDef().map(::FieldDefinition).onEach {
+    it.isAbstract = true // flag as abstract
+    it.inheritsFrom = emptySet() // initialize lateinit var
+  }.toSet()
 
   override fun toKotlin(): TypeSpec = TypeSpec.interfaceBuilder(name).apply {
     addProperties(fields.map {
@@ -95,7 +106,7 @@ class EnumDef(context: GraphQLSchemaParser.EnumDefContext)
 
   override fun toKotlin(): TypeSpec = TypeSpec.enumBuilder(name).apply {
     options.forEach { addEnumConstant(it) }
-    addSuperinterface("QEnumType".asTypeName())
+    addSuperinterface(QEnumType::class.asTypeName())
   }.build()
 
 }
@@ -128,24 +139,30 @@ class InputDef(context: GraphQLSchemaParser.InputTypeDefContext)
 
 }
 
-sealed class ScalarType : SchemaType<PlatformTypeContext>(PlatformTypeContext)
+sealed class ScalarType : SchemaType<PlatformTypeContext>(PlatformTypeContext) {
+  abstract val stubClass: KClass<out PrimitiveStub>
+}
 
 object IntType : ScalarType() {
+  override val stubClass = IntStub::class
   override val name: String get() = "Int"
   override fun toKotlin(): TypeSpec = throw UnsupportedOperationException()
 }
 
 object StringType : ScalarType() {
+  override val stubClass = StringStub::class
   override val name: String get() = "String"
   override fun toKotlin(): TypeSpec = throw UnsupportedOperationException()
 }
 
 object FloatType : ScalarType() {
+  override val stubClass = FloatStub::class
   override val name: String get() = "Float"
   override fun toKotlin(): TypeSpec = throw UnsupportedOperationException()
 }
 
 object BooleanType : ScalarType() {
+  override val stubClass = BooleanStub::class
   override val name: String get() = "Boolean"
   override fun toKotlin(): TypeSpec = throw UnsupportedOperationException()
 }

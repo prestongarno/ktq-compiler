@@ -2,29 +2,35 @@ package com.prestongarno.ktq.compiler
 
 import com.prestongarno.ktq.org.antlr4.gen.GraphQLSchemaLexer
 import com.prestongarno.ktq.org.antlr4.gen.GraphQLSchemaParser
+import org.antlr.v4.runtime.ANTLRErrorListener
 import org.antlr.v4.runtime.CharStream
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
+import org.antlr.v4.runtime.Parser
+import org.antlr.v4.runtime.RecognitionException
+import org.antlr.v4.runtime.Recognizer
 import org.antlr.v4.runtime.Token
+import org.antlr.v4.runtime.atn.ATNConfigSet
+import org.antlr.v4.runtime.dfa.DFA
 import java.io.File
+import java.util.*
 import kotlin.properties.Delegates
 
 typealias SchemaRule = Set<SchemaType<*>>.() -> Unit
 typealias SymbolScopeRule = Set<ScopedSymbol>.(ScopedDeclarationType<*>) -> Unit
 
-/**
- * TODO use antlr4's listener hooks to stop unnecessary iteration for validation rules */
+/** TODO use antlr4's listener hooks to stop unnecessary iteration for validation rules */
 class GraphQLCompiler(
     private val schema: Schema,
     private val scope: Configuration.() -> Unit = { /* nothing */ }
 ) {
 
   /** This is kept in sync by the [GraphQLCompiler.definitions] variable. Do NOT add definitions here */
-  private val symtab: MutableMap<String, SchemaType<*>> = ScalarPrimitives.values().map {
-    Pair(it.typeDef.name, it.typeDef)
+  internal val symtab: MutableMap<String, SchemaType<*>> = ScalarPrimitives.values().map {
+    it.typeDef.name to it.typeDef
   }.toMap(mutableMapOf())
 
-  val definitions: MutableSet<SchemaType<*>> by Delegates.observable(mutableSetOf()) { _, _, newValue ->
+  internal val definitions: MutableSet<SchemaType<*>> by Delegates.observable(mutableSetOf()) { _, _, newValue ->
     newValue.filter { symtab[it.name] == null }.forEach { defn ->
       symtab[defn.name] = defn
     }
@@ -37,8 +43,7 @@ class GraphQLCompiler(
   )
 
   private val scopedSymbolRules = listOf<SymbolScopeRule>(
-      `no duplicate symbol names`(),
-      `check supertype property inheritance`() // TODO implement this rule
+      `no duplicate symbol names`()
   )
 
   fun compile() {
@@ -55,55 +60,31 @@ class GraphQLCompiler(
     val lexer = GraphQLSchemaLexer(input)
     val stream = CommonTokenStream(lexer)
     val parser = GraphQLSchemaParser(stream)
+
+    parser.addErrorListener(MessageHandler())
+
     val result = parser.graphqlSchema()
 
     // Add type definitions to context
-    result.apply {
-      definitions += enumDef().map { EnumDef(it) }
-      definitions += inputTypeDef().map { InputDef(it) }
-      definitions += interfaceDef().map { InterfaceDef(it) }
-      definitions += typeDef().map { TypeDef(it) }
-      definitions += scalarDef().map { ScalarDef(it) }
-      definitions += unionDef().map { UnionDef(it) }
-    }
+    definitions += result.enumDef().map { EnumDef(it) }
+    definitions += result.inputTypeDef().map { InputDef(it) }
+    definitions += result.interfaceDef().map { InterfaceDef(it) }
+    definitions += result.typeDef().map { TypeDef(it) }
+    definitions += result.scalarDef().map { ScalarDef(it) }
+    definitions += result.unionDef().map { UnionDef(it) }
+    symtab.putAll(definitions.map { it.name to it })
 
+    // processing & intermediate type structure
     attrInheritance()
-    attrFields()
+    attrFieldTypes()
     attrUnions()
 
-    schemaRules.forEach { it(definitions) }
-
+    schemaRules.onEach { it(definitions) }
     inspectFields(*scopedSymbolRules.toTypedArray())
   }
 
-  /**
-   * assign type definitions to fields & arguments */
-  private fun attrInheritance() {
 
-    fun TypeDef.setSupertypes(def: Set<InterfaceDef>) {
-      this.supertypes = def
-    }
-    // partition definitions by instance/type
-    val filtered = Types(definitions)
-    // map interfaces as supertypes to types
-    filtered.types.forEach { type ->
-      // map supertype names to types from symbol table
-      type.context.implementationDefs()?.typeName()?.map {
-        it.Name().text
-      }?.map { superName ->
-        // todo split up this spaghetti
-        (symtab[superName] as? InterfaceDef ?: throw IllegalArgumentException(
-            "Supertype declaration $superName on type ${type.name} is not an interface type!"
-        )) ?: throw IllegalArgumentException(
-            "Unknown supertype name $superName on type declaration ${type.name}"
-        )
-      }?.toSet()?.let { supers ->
-        type.setSupertypes(supers)
-      } ?: type.setSupertypes(emptySet())
-    }
-  }
-
-  private fun attrFields() {
+  private fun attrFieldTypes() {
 
     fun FieldDefinition.setType(type: SchemaType<*>) {
       this.type = type
@@ -143,6 +124,7 @@ class GraphQLCompiler(
     }
   }
 
+
   /**
    * Apply validation to a set of symbols within the same scope */
   private fun inspectFields(vararg rules: SymbolScopeRule) {
@@ -151,28 +133,11 @@ class GraphQLCompiler(
     }
   }
 
-  private class Types(schemaDefs: Set<SchemaType<*>>) {
-    val types = schemaDefs.filterIsInstance<TypeDef>()
-    val enums = schemaDefs.filterIsInstance<EnumDef>()
-    val unions = schemaDefs.filterIsInstance<UnionDef>()
-    val interfaces = schemaDefs.filterIsInstance<InterfaceDef>()
-    val scalars = schemaDefs.filterIsInstance<ScalarDef>()
-    val inputs = schemaDefs.filterIsInstance<InputDef>()
-  }
-
-  /**
-   * Kotlin DSL for no reason other than "why not?" */
   class Configuration private constructor(val schema: Schema) {
-
+    // todo compilation options here for gradle build config
     companion object {
-
-      internal fun fromContext(schema: Schema, scope: Configuration.() -> Unit): Configuration {
-        return Configuration(schema).apply {
-          this.scope()
-
-        }
-      }
-
+      internal fun fromContext(schema: Schema, scope: Configuration.() -> Unit): Configuration =
+          Configuration(schema).apply(scope)
     }
   }
 }
@@ -192,9 +157,9 @@ private fun `type name does not match scalar primitive`(): SchemaRule = {
 }
 
 private fun `unique supertype declarations`(): SchemaRule = {
-  filterIsInstance<TypeDef>().forEach { type ->
-    require(type.supertypes.distinct().size == type.supertypes.size) {
-      "Illegal supertype declaration at type ${type.name} (duplicate declaration)"
+  on<TypeDef> {
+    require(supertypes.distinct().size == supertypes.size) {
+      "Illegal supertype declaration at type $name (duplicate declaration)"
     }
   }
 }
@@ -206,14 +171,47 @@ private fun `no duplicate symbol names`(): SymbolScopeRule = {
   }
 }
 
-private fun `check supertype property inheritance`(): SymbolScopeRule = { declarationType ->
-  if (declarationType is TypeDef) {
-    // TODO(diamond problem)
-  }
-}
-
 private fun Token.toCoordinates() = "[${this.line},${this.startIndex}]"
 
 fun <T> List<T>.applyEach(scope: T.() -> Unit) = forEach(scope)
 
-inline fun <reified T> Collection<*>.on(action: T.() -> Unit) = filterIsInstance<T>().forEach(action)
+inline fun <reified T> Collection<*>.on(action: T.() -> Unit) = this?.filterIsInstance<T>()?.forEach(action)
+
+private class MessageHandler : ANTLRErrorListener {
+      override fun reportAttemptingFullContext(
+          recognizer: Parser?,
+          dfa: DFA?,
+          startIndex: Int,
+          stopIndex: Int,
+          conflictingAlts: BitSet?,
+          configs: ATNConfigSet?
+      ) {}
+
+      override fun syntaxError(
+          recognizer: Recognizer<*, *>?,
+          offendingSymbol: Any?,
+          line: Int,
+          charPositionInLine: Int,
+          msg: String?,
+          e: RecognitionException?
+      ) { TODO(msg?:"") }
+
+      override fun reportAmbiguity(
+          recognizer: Parser?,
+          dfa: DFA?,
+          startIndex: Int,
+          stopIndex: Int,
+          exact: Boolean,
+          ambigAlts: BitSet?,
+          configs: ATNConfigSet?
+      ) { /* nothing */ }
+
+      override fun reportContextSensitivity(
+          recognizer: Parser?,
+          dfa: DFA?,
+          startIndex: Int,
+          stopIndex: Int,
+          prediction: Int,
+          configs: ATNConfigSet?
+      ) { /* nothing */ }
+    }
