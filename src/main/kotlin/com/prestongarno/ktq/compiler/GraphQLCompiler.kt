@@ -61,8 +61,6 @@ class GraphQLCompiler(
     val stream = CommonTokenStream(lexer)
     val parser = GraphQLSchemaParser(stream)
 
-    parser.addErrorListener(MessageHandler())
-
     val result = parser.graphqlSchema()
 
     // Add type definitions to context
@@ -79,7 +77,7 @@ class GraphQLCompiler(
     attrInheritance()
     attrUnions()
 
-    // schema-specific rules
+    // TODO use MemberEnter style on AST like javac does
     schemaRules.onEach { it(definitions) }
     inspectFields(*scopedSymbolRules.toTypedArray())
   }
@@ -94,11 +92,10 @@ class GraphQLCompiler(
     val contextTypes = definitions.filterIsInstance<ScopedDeclarationType<*>>()
     // map field type name to type instance
     contextTypes.flatMap { it.fields }.asSequence().forEach { field ->
-      val typeName = field.context.typeSpec().typeName().Name().text
-      symtab[typeName]?.let { type ->
+      symtab[field.typeName]?.let { type ->
         field.setType(type)
       } ?: throw IllegalArgumentException(
-          "Unknown type attr for field ${field.name} '$typeName' at ${field.context.start.toCoordinates()}")
+          "Unknown type attr for field ${field.name} '$field.typeName' at ${field.context.start.toCoordinates()}")
     }
     // map arguments' type names to type instance TODO nest this ^^^
     contextTypes.flatMap { it.fields.flatMap { it.arguments } }.forEach { argument ->
@@ -178,41 +175,3 @@ fun <T> List<T>.applyEach(scope: T.() -> Unit) = forEach(scope)
 
 inline fun <reified T> Collection<*>.on(action: T.() -> Unit) = this.filterIsInstance<T>().forEach(action)
 
-private class MessageHandler : ANTLRErrorListener {
-      override fun reportAttemptingFullContext(
-          recognizer: Parser?,
-          dfa: DFA?,
-          startIndex: Int,
-          stopIndex: Int,
-          conflictingAlts: BitSet?,
-          configs: ATNConfigSet?
-      ) {}
-
-      override fun syntaxError(
-          recognizer: Recognizer<*, *>?,
-          offendingSymbol: Any?,
-          line: Int,
-          charPositionInLine: Int,
-          msg: String?,
-          e: RecognitionException?
-      ) { TODO(msg?:"") }
-
-      override fun reportAmbiguity(
-          recognizer: Parser?,
-          dfa: DFA?,
-          startIndex: Int,
-          stopIndex: Int,
-          exact: Boolean,
-          ambigAlts: BitSet?,
-          configs: ATNConfigSet?
-      ) { /* nothing */ }
-
-      override fun reportContextSensitivity(
-          recognizer: Parser?,
-          dfa: DFA?,
-          startIndex: Int,
-          stopIndex: Int,
-          prediction: Int,
-          configs: ATNConfigSet?
-      ) { /* nothing */ }
-    }

@@ -14,6 +14,7 @@ import com.prestongarno.ktq.org.antlr4.gen.GraphQLSchemaParser.*
  *   6.   create type info
  *
  */
+// TODO pass type && supertype to [registerAsSuper] method for diagnostics
 internal fun GraphQLCompiler.attrInheritance() {
   definitions.on<TypeDef> {
 
@@ -21,7 +22,6 @@ internal fun GraphQLCompiler.attrInheritance() {
         .map(FieldDefinition::newCache)
         .toMap(mutableMapOf())
 
-    // TODO pass type && supertype to [registerAsSuper] method for diagnostics
     context.implementationDefs()
         ?.typeName()
         ?.map(TypeNameContext::toNameString)

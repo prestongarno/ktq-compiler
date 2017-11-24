@@ -106,5 +106,6 @@ class AntlrAstParsing {
   }
 }
 
-infix fun Any?.eq(other: Any?) = assertThat(this).isEqualTo(other)
+@Suppress("NOTHING_TO_INLINE")
+inline infix fun Any?.eq(other: Any?) = assertThat(this).isEqualTo(other)
 fun GraphQLSchemaParser.TypeNameContext.value() = this.Name().text

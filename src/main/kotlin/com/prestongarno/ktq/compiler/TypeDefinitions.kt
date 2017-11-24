@@ -38,7 +38,7 @@ sealed class SchemaType<out T : ParserRuleContext>(val context: T) : KotlinTypeE
   abstract val delegateStubClass: KClass<*>
   abstract val delegateListStubClass: KClass<*>
 
-  // this is literally 100s of lines simpler than the last one
+  // this is literally hundreds of lines simpler than the last one
   open fun getStubDelegationCall(field: FieldDefinition): CodeBlock = when {
     field.arguments.isEmpty() -> "stub<%T>()" to listOf(name)
     field.arguments.isNotEmpty() && field.arguments.find { !it.nullable } == null ->
@@ -69,8 +69,12 @@ class TypeDef(context: GraphQLSchemaParser.TypeDefContext)
   override fun toKotlin(): TypeSpec = TypeSpec.objectBuilder(name).apply {
     addSuperinterface(schemaTypeClass)
     addProperties(fields.map { it.toKotlin() })
-    addSuperinterfaces(supertypes.map { it.name.asTypeName() })
-    //addTypes(TODO()) // Argument builder types/classes
+    addSuperinterfaces(supertypes.map {
+      it.name.asTypeName()
+    })
+    addTypes(fields.mapNotNull {
+      it.argBuilder?.toKotlin()
+    })
   }.build()
 
   override val schemaTypeClass = QType::class

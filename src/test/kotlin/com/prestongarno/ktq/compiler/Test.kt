@@ -30,9 +30,12 @@ fun compileOut(schema: String, includeImports: Boolean = true, block: (GraphQLCo
       val target = StringBuilder()
       it.writeTo(target)
       target.toString() // smh kotlinpoet
-          .replace("^import.*\n".toRegex(RegexOption.MULTILINE), "")
-          .replace("^package.*\n".toRegex(RegexOption.MULTILINE), "")
-          .replace("\n\n", "")
+          .let {
+            if (includeImports) it else
+              it.replace("^import.*\n".toRegex(RegexOption.MULTILINE), "")
+                  .replace("^package.*\n".toRegex(RegexOption.MULTILINE), "")
+                  .replace("^\n\n", "")
+          }
     }
 
 private fun Set<SchemaType<*>>.toFileSpec(): FileSpec =
