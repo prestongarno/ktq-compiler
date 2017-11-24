@@ -3,9 +3,9 @@ package com.prestongarno.ktq.compiler
 import com.prestongarno.ktq.indent
 import org.junit.Test
 
-class IdlApiStructures {
+class InheritanceTests {
 
-  @Test fun `this thing work first shot?`() {
+  @Test fun `structure is correct`() {
     val mockSchema = """
       type Foo {
         name: String
@@ -135,6 +135,24 @@ class IdlApiStructures {
         }
       }
     }?: null!!
+  }
+
+  @Test fun `inconsistent return type override fails`() {
+    val mockSchema = """
+      |interface Bar {
+      |  name(val1: Int!): Foo
+      |}
+      |
+      |type Foo implements Bar {
+      |  name(val1: Int!): String
+      |}
+      |
+      """.trimMargin("|")
+
+    assertThrows<IllegalArgumentException> {
+      GraphQLCompiler(StringSchema(mockSchema)).compile()
+    }.hasMessageThat()
+        .contains("does not override")
   }
 }
 

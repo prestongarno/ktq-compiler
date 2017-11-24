@@ -13,6 +13,7 @@ import com.prestongarno.ktq.stubs.TypeStub
 import com.prestongarno.ktq.stubs.UnionListStub
 import com.prestongarno.ktq.stubs.UnionStub
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName
 import com.squareup.kotlinpoet.PropertySpec
@@ -47,14 +48,30 @@ data class FieldDefinition(val context: GraphQLSchemaParser.FieldDefContext) : S
 
   val arguments: List<ArgumentDefinition> = context.fieldArgs()
       ?.argument()
-      ?.map(::ArgumentDefinition)
-      ?: emptyList()
+      ?.map(::ArgumentDefinition) ?: emptyList()
 
   override fun toKotlin(): PropertySpec =
-      PropertySpec.builder(name, ktqGraphQLDelegateKotlinpoetTypeName()).build()
+      PropertySpec.builder(
+          name,
+          ktqGraphQLDelegateKotlinpoetTypeName()
+      ).apply {
+        if (!isAbstract)
+          delegate(type.getStubDelegationCall(this@FieldDefinition))
+        if (inheritsFrom.isNotEmpty())
+          addModifiers(KModifier.OVERRIDE)
+      }.build()
 
   /**
+   * ***Finally*** a simple and consistent API call structure for all types,
+   * where all combinations of field configurations are covered. The structure
+   * of the ktq type is described like this:
+   *
    * [ StubType ].[ Query<T> | OptionalConfigQuery<T, A> | ConfigurableQuery<T, A> ]
+   *
+   *
+   * ***where***
+   *
+   *
    * StubType: [ [String|Float|Int|Boolean]{Array}Delegate | [Type|Interface|Union|Enum|CustomScalar]{List}Stub ]
    *
    * Primitive delegates/stubs don't have a type argument.
@@ -143,6 +160,13 @@ data class ArgumentDefinition(val context: GraphQLSchemaParser.ArgumentContext) 
           && nullable == it.nullable
           && isList == it.isList
     } ?: return false
+  }
+
+  override fun hashCode(): Int {
+    var result = context.hashCode()
+    result = 31 * result + nullable.hashCode()
+    result = 31 * result + isList.hashCode()
+    return result
   }
 }
 
