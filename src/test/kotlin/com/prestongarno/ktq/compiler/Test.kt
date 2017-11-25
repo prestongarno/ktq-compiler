@@ -3,8 +3,10 @@ package com.prestongarno.ktq.compiler
 import com.google.common.truth.ThrowableSubject
 import com.google.common.truth.Truth.assertThat
 import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.TypeSpec
 import java.time.Instant
 import java.util.*
+import kotlin.reflect.KCallable
 
 inline fun <reified T> assertThrows(block: () -> Unit): ThrowableSubject {
   try {
@@ -38,13 +40,12 @@ fun compileOut(schema: String, includeImports: Boolean = true, block: (GraphQLCo
           }
     }
 
-fun Set<SchemaType<*>>.toFileSpec(): FileSpec =
-    FileSpec.builder("com.prestongarno.ktq.compiler",
-        "TestCompile${Instant.now()}.kt").apply {
-      map(SchemaType<*>::toKotlin)
-          .forEach { this.addType(it) }
+fun Set<SchemaType<*>>.toFileSpec(baseName: String = "GraphQLSchema"): FileSpec =
+    FileSpec.builder("", "${Instant.now().toEpochMilli()}.kt").apply {
+      map(SchemaType<*>::toKotlin).let(this::addTypes)
     }.build()
 
-// Not a test case without functional printlines
-fun String.println() = println(this)
+// Not a test case without a functional println
+fun Any?.println() = println(this)
 
+private fun FileSpec.Builder.addTypes(types: Iterable<TypeSpec>) = types.forEach { addType(it) }

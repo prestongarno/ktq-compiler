@@ -18,24 +18,15 @@ import kotlin.reflect.KClass
 
 object JvmCompile {
 
-  fun fromString(input: String): KtqCompileWrapper {
-    val kotlinOut = File.createTempFile("Kotlinpoet${Instant.now().toEpochMilli()}", ".kt")
-        .apply(File::deleteOnExit)
-    kotlinOut.writeText(input)
-    return exe(kotlinOut, Files.createTempDir()
-        .apply(File::deleteOnExit))
-  }
-
   @JvmOverloads
   fun exe(input: File, buildDir: File, printStream: PrintStream? = null): KtqCompileWrapper {
     K2JVMCompiler().run {
       val args = K2JVMCompilerArguments().apply {
-        freeArgs = mutableListOf(input.absolutePath)
+        freeArgs = mutableListOf(input.path)
+        destination = buildDir.absolutePath
         loadBuiltInsFromDependencies = true
         includeRuntime = false
         noOptimize = true
-        singleModule = true
-        destination = buildDir.absolutePath
         classpath = System.getProperty("java.class.path")
             .split(System.getProperty("path.separator"))
             .filter {
@@ -43,16 +34,17 @@ object JvmCompile {
             }.joinToString(":")
         noStdlib = true
         noReflect = true
+        noJdk = true
         skipRuntimeVersionCheck = true
         reportPerf = true
       }
       buildDir.deleteOnExit()
-      // TODO -> Compilation services for stubbing classes without output et. al. black magic
-      // TODO -> Services.Builder().register(interfaceClass = TODO(), implementation = TODO())
       execImpl(printStream?.let {
         PrintingMessageCollector(it, MessageRenderer.PLAIN_RELATIVE_PATHS, true)
-      } ?:MessageCollector.NONE, Services.EMPTY, args)
-    }.code.also { exitCode -> require(exitCode == 0) }
+      } ?: MessageCollector.NONE, Services.EMPTY, args)
+    }.code.also { exitCode ->
+      require(exitCode == 0)
+    }
     return KtqCompileWrapper(buildDir)
   }
 
@@ -78,12 +70,12 @@ class KtqCompileWrapper(private val root: File) {
 
   fun delete() = Unit ?:
       loader.urLs.map(URL::toURI)
-      .map(::File)
-      .map(File::walkBottomUp)
-      .flatMap(FileTreeWalk::asIterable)
-      .filter(File::isJavaFile)
-      .filter(File::canWrite)
-      .forEach(File::deleteOnExit)
+          .map(::File)
+          .map(File::walkBottomUp)
+          .flatMap(FileTreeWalk::asIterable)
+          .filter(File::isJavaFile)
+          .filter(File::canWrite)
+          .forEach(File::deleteOnExit)
 }
 
 fun String.asFile() = File(this)
