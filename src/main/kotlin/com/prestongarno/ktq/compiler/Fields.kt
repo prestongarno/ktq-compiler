@@ -103,7 +103,7 @@ data class FieldDefinition(override val context: GraphQLSchemaParser.FieldDefCon
       is InputDef -> QInput::class
       is TypeDef -> TypeStub::class
       is UnionDef -> UnionStub::class
-      is ScalarType -> ScalarPrimitives.normalized[type.name]!!.typeDef.stubClass
+      is ScalarType -> ScalarPrimitives.named[type.name]!!.typeDef.stubClass
     }
 
     fun `type name for list field`() = when (type) {

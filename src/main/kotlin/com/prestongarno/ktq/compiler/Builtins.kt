@@ -7,7 +7,7 @@ enum class ScalarPrimitives(val typeDef: ScalarType) {
   STRING(StringType);
 
   companion object {
-    val normalized: Map<String, ScalarPrimitives> = values().map { Pair(it.typeDef.name, it) }.toMap()
+    val named: Map<String, ScalarPrimitives> = values().map { Pair(it.typeDef.name, it) }.toMap()
   }
 }
 

@@ -123,7 +123,7 @@ private fun `duplicate type names check`(): SchemaRule = {
 
 private fun `type name does not match scalar primitive`(): SchemaRule = {
   forEach { defn ->
-    require(ScalarPrimitives.normalized[defn.name] == null) {
+    require(ScalarPrimitives.named[defn.name] == null) {
       "Illegal schema declaration name '${defn.name}' at" + defn.context.sourceInterval.a
     }
   }
@@ -145,8 +145,6 @@ private fun `no duplicate symbol names`(): SymbolScopeRule = {
 }
 
 private fun Token.toCoordinates() = "[${this.line},${this.startIndex}]"
-
-fun <T> List<T>.applyEach(scope: T.() -> Unit) = forEach(scope)
 
 inline fun <reified T> Collection<*>.on(action: T.() -> Unit) = this.filterIsInstance<T>().forEach(action)
 
